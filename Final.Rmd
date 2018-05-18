@@ -1,0 +1,351 @@
+---
+title: "Data Science for the Olympics"
+output:
+  html_document:
+    df_print: paged
+---
+
+By Quinn Baranoski
+
+Introduction
+
+If you're anything like me, you really enjoy watching the Olympics. There's always a variety of sports to see, and the competition between countries to get the most medals adds a level of interest beyond that of an ordinary sports competition. The Olympics can also be a playground for data scientists, as there are accurate records of athletes and events dating back over 100 years, and as a version of the Olympics occurs every two years, any analysis on them is bound to be relevant in the near future. If you are unfamiliar with the concept of the Olympics, or if you simply want to learn about them before we get started, you can visit their site here: https://www.olympic.org
+
+In my opinion, one of the most engaging parts of the Olympics is the medal count. When countries compete to get the most medals overall it adds a sense of stakes to each event, and keeping track of the overall medals is a good way to tie together the sometimes vastly different individual events. Earning a lot of medals through their talented athletes can also be a source of national pride for many countries. With that in mind, in this tutorial I will walk you through examining the interesting data of the Olympics, with a focus on looking at factors that could contribute the the US medal count. In this way we can hypothesize some strategies that the USA could use to increase their medal count in future Olympics.
+
+This tutorial does not assume any in-depth knowledge of R or data science, and so before each code snippet I will be walking you through what the code does, and after each one I will help you interpret the results. 
+
+Before we start, let's get the library ggplot2. This will help with the many graphs that we will be using to visualize data later on. While we're at it, let's get dplyr, which will provide a summarize() function that we will make frequent use of.
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+1. Let's Get Some Data!
+
+We will be using 2 different datasets for this tutorial, one for the Summer Olympics and one for the Winter Olympics. The datasets come from Kaggle, and before we start you should download them here: https://www.kaggle.com/the-guardian/olympic-games/data
+Download the two files named summer.csv and winter.csv and we are good to go! (Note: you will need to create a free Kaggle account to download the data if you don't already have one.)
+
+Got your data? Great! Next we need to get the data into a form that we can use easily. For this tutorial, we will be using data frames, a popular option for R. IF you are unfamiliar with data frames, you can learn more about them here: http://www.r-tutor.com/r-introduction/data-frame
+Note that you can complete this tutorial without much specific knowledge on data frames; just think of them as tables that we can operate on. With that being said, let's make ours:
+```{r}
+sdf <- read.csv(file="~/Downloads/summer.csv", header = TRUE, sep = ",")
+wdf <- read.csv(file="~/Downloads/winter.csv", header = TRUE, sep = ",")
+
+```
+
+We have just created two dataframes, sdf and wdf, which stand for "Summer Dataframe" and "Winter Dataframe", containing our data from the Summer and Winter Olympics respectively. Let's take a look at these quickly, starting with the summer dataset:
+```{r}
+head(sdf)
+```
+
+We can see that the data starts at the 1896 Olympics in Athens and contains information such as the Country, Gender, Sport, Discipline and Event of every athlete who has won an Olympic medal. Pretty neat! We get a similar outcome when we look at the winter dataframe:
+```{r}
+head(wdf)
+```
+
+Having these dataframes is all well and good, but for some data analysis we are going to want to look at the Olympics as a whole and not just summer of winter events. To ease this process, we would like to combine the two datasets. This turns out to be very easy- doable in one line of code. It's things like this that make R such a popular language among data scientists:
+```{r}
+odf <- rbind(sdf, wdf)
+```
+
+We now have a dataframe odf, which stands for "Olympic Dataframe", that holds the combined data of the summer and winter dataframes. Neat!
+
+Exploratory Data Analysis
+
+Thanks to the power of R and the good folks at Kaggle, we have in a few lines of code accomplished what could otherwise be a long, ardurous task of compiling our Olympic data. Indeed, we don't even need to clean up our data, since the author of the dataset was nice enough to tidy it for us. In some projects, however, tidying data is an important step of the data science process; if you would like to learn more about this step, you can read a great tutorial here: http://garrettgman.github.io/tidying/
+
+However, since this step was done for us we have more time to dig into the meat of this tutorial: the data analysis! Before we get started with anything too involved, however, let's take a little bit of time to get to know our dataset. We can get a sense of the size of the thing with a line like the following:
+```{r}
+summarize(odf, num_countries = n_distinct(Country))
+```
+
+Or this:
+```{r}
+summarize(odf, num_athletes = n_distinct(Athlete))
+```
+
+Which show that a total of 26,495 athletes have won medals for 149 countries over the years. 
+You can plug any attribute (column name) instead of "Athlete", and any dataframe instead of "odf", to see different things about the data, if you so desire.
+
+We can also look at things like the total number of medals won by athletes of a certain country, like so:
+```{r}
+odf %>%
+  filter(Country == "USA") %>%
+  summarize(num_medals = n())
+```
+
+So we see that US athletes have accumulated 5238 medals over the years. Note that this figure is slightly different from a typical medal count because it will count medals for each athlete in team events, whereas most medal counts would only count one medal per event. However for this tutorial we will be using this version of medal counting because data on the other method is readily available online. For example, or if you are curious, you can see a table of total medals per country here: https://en.wikipedia.org/wiki/All-time_Olympic_Games_medal_table. For the purposes of this tutorial, then, medal count will refer to the number of athletes that won medals, rather than the number of events that medals were won in. Also note that you can plug in any country code instead of "USA" to see the number of medals won by athletes of that country.
+
+A natural follow-up question is if we can see the total medal count for every country, and in fact we can. The code below graphs the medal count for every country.
+```{r}
+odf %>%
+  group_by(Country) %>%
+  summarize(num_medals = n()) %>%
+  ggplot(mapping = aes(x = Country, y = num_medals)) + 
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.05))
+
+```
+
+Yikes! What a mess! As tempting as it is to see all the data in one graph, 149 countries is just too much to have all on the same chart. Let's try looking at the top 10 instead:
+```{r}
+odf %>%
+  group_by(Country) %>%
+  summarize(num_medals = n()) %>%
+  arrange(desc(num_medals)) %>%
+  slice(1:10) %>%
+  ggplot(mapping = aes(x = reorder(Country, num_medals), y = num_medals)) + 
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.05)) +
+  labs(title="Top 10 All-Time Medal Winning Countries",
+         x = "Country",
+         y = "Total Number of Medal-Winning Athletes")
+```
+
+This is much better. We can see that the USA leads the world by far by the number of athletes who have won medals. If you would like to view a different segment of the graph, just replace "1:10" in the slice function with the values of the graph you would like to see. For example, to see the 100-110th place finishers, use slice(110:110). 
+
+Another natural question to ask about Olympic data is who has won the most medals. So, let's find out: 
+```{r}
+odf %>%
+  group_by(Athlete) %>%
+  summarize(num_medals = n()) %>%
+  arrange(desc(num_medals)) %>%
+  slice(1:10) %>%
+  left_join(odf, by="Athlete") %>%
+  ggplot(mapping = aes(x = reorder(Athlete, num_medals), y = (num_medals/num_medals), fill = Country)) + 
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.05)) +
+  labs(title="Top 10 All-Time Medal Winning Athletes",
+         x = "Athlete",
+         y = "Total Number of Olympic Medals")
+```
+
+This is an interesting table, but looking at it can give the wrong impressions for a viewer of the current Olympics. For example, the URS has 3 athletes in the top 10, which could lead an observer to speculate that Russia dominates the Olympics, but let's look at a more updated version before we draw any conclusions. The following produces a similar graph, but limited to athletes medaling in 2000 or later. 
+```{r}
+odf %>%
+  filter(Year >= 2000) %>%
+  group_by(Athlete) %>%
+  summarize(num_medals = n()) %>%
+  arrange(desc(num_medals)) %>%
+  slice(1:10) %>%
+  left_join(odf, by="Athlete") %>%
+  ggplot(mapping = aes(x = reorder(Athlete, num_medals), y = 1, fill = Country)) + 
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.05)) +
+  labs(title="Top 10 Medal Winning Athletes Since 2000",
+         x = "Athlete",
+         y = "Total Number of Olympic Medals")
+
+```
+
+This produces some interesting results. You'll notice that Russia isn't in the top 10 at all, but the USA has jumped from 2 spots to 4. Clearly things can change a lot in the Olympics over time! This table also suggests that the US is enjoying something of a surge in Olympic success. Let's investigate that notion a little more. To do so we will create a new dataframe, USAodf, which contains the number of medals won by USA athletes each year of the Olympics:
+```{r}
+USAodf <- odf %>%
+  filter(Country == "USA") %>%
+  group_by(Year) %>%
+  summarize(USA_num_medals = n()) 
+head(USAodf)
+```
+
+Now let's plot the number of US medals per year, to see if the US really is experiencing a surge in Olympic success:
+```{r}
+USAodf%>%
+  ggplot(mapping = aes(x = Year, y = USA_num_medals)) +
+  geom_point() + geom_line() +
+  labs(title = "USA Medals per Year",
+       x = "Year", 
+       y = "Number of USA Olympic Medals")
+```
+
+This graph shows that the number of medals that the USA wins is indeed going up on average every Olympics. A word of caution about this graph, however; for all we know, the number of medals awarded goes up each Olympics, and so an increase in US medals isn't as significant as it looks. In addition, do you notice how at the end the values spike up and down frequently? We will get to that in a second, but first, let's deal with the issue of US medal growth by calculating the US medals as a percentage of the total medals:
+```{r}
+odf %>%
+  group_by(Year) %>%
+  summarize(num_medals = n()) %>%
+  full_join(USAodf, by= "Year") %>%
+  mutate(USA_percent = USA_num_medals/num_medals*100) %>%
+  ggplot(mapping = aes(x = Year, y = USA_percent)) +
+  geom_point() + geom_line() +
+  labs(title = "USA Medal Percentage per Year",
+       x = "Year", 
+       y = "Percentage of Olympic Medals Won by US Athletes")
+```
+
+You'll notice that this graph is, on the whole, much smoother than the previous one. It also gives us valuable insights into the data- for example, we can now see that in one year (1904), the USA won a staggering 80+% of all the medals, and that it has been hovering consistently between the 10 and 20 percent mark for the large part of the last 50 years. This rejects the notion that the USA has had a recent surge in overall Olympic results, as the percentage of medal wins now is not that different from that in the 60's or the 90's. 
+Remember that weird fluctuation in the last graph, where values spiked wildly between 1990 and the present? That was caused by the fact that the Winter Olympics were split to a different year than the Summer Olympics in 1994, and so medal totals could vary wildly based on which season of the Olympics the USA was competing in. 
+
+The next natural question is to compare the result of the USA's performance in the Summer and Winter Olympics. To do that we have to organize the data some. First let's create a dataframe of the total number of medals awarded to athletes per year for the Summer Olympics.
+```{r}
+totaled_sdf <- sdf %>%
+  group_by(Year) %>%
+  summarize(num_medals = n())
+```
+
+Next we'll combine totaled_sdf with a dataframe containing the number of US medals per year, and use the combined data to create a column that has the percentage of medals that the USA won for each year of the Summer Olympics. This all gets stored in the dataframe USA_sdf.
+```{r}
+USA_sdf <- sdf %>%
+  filter(Country == "USA") %>%
+  group_by(Year) %>%
+  summarize(USA_num_medals = n()) %>%
+  left_join(totaled_sdf, by= "Year") %>%
+  mutate(USA_percent = USA_num_medals/num_medals*100)
+USA_sdf
+```
+
+Now let's repeat the last two steps but for the Winter Olympics, creating the USA_wdf dataframe.
+```{r}
+totaled_wdf <- wdf %>%
+  group_by(Year) %>%
+  summarize(num_medals = n())
+```
+
+```{r}
+USA_wdf <- wdf %>%
+  filter(Country == "USA") %>%
+  group_by(Year) %>%
+  summarize(USA_num_medals = n()) %>%
+  left_join(totaled_wdf, by= "Year") %>%
+  mutate(USA_percent = USA_num_medals/num_medals*100)
+USA_wdf
+  
+```
+
+Now we can graph the two one the same plot, with the USA's Summer Olympic medal percentage in red and the Winter Olympic percentage in blue:
+```{r}
+ggplot() +
+  geom_line(data = USA_sdf, mapping = aes(x = Year, y = USA_percent), color = "red") +
+  geom_line(data = USA_wdf, mapping = aes(x = Year, y = USA_percent), color = "blue") 
+
+
+```
+
+You can see that, in general, the US has done better in the Summer Olympics since around 1970, with the exception of two spikes in Winter Olympic Performance in the 2000s. 
+
+Something we haven't looked at so far is gender contributions to the medal total: that is, if the USA does better in events for male or female athletes. Below is code (similar to the code above) that graphs the percentage of US medals that were won by women in the Olympics.
+```{r}
+USA_women_odf <- odf %>%
+  filter(Country == "USA") %>%
+  filter(Gender == "Women") %>%
+  group_by(Year) %>%
+  summarize(USA_women_medals= n()) %>%
+  left_join(USAodf, by = "Year") %>%
+  mutate(women_medal_percent = USA_women_medals/USA_num_medals * 100)
+```
+
+```{r}
+  USA_women_odf %>% 
+  ggplot(mapping = aes(x = Year, y = women_medal_percent)) +
+  geom_point() + geom_smooth(method = lm) +
+  labs(title = "USA Percentage of Female Medal Winning Athletes per Year",
+       x = "Year", 
+       y = "Percentage of USA Olympic Medals Won By Women")
+```
+
+You'll notice that the percentage starts at 0 in 1896 and exceeds on average 50% by the most recent Olympics. This means that, on average, female athletes are more valuable than male ones for the US's medal total. 
+
+Next, in the spirit that standardization is always good, we will standardize the US's percentage of female medalists by the percentage of female medalists in the Games as a whole. To do this we first need to create a dataframe that computes the percentage of women medalists per year at the Olympics:
+```{r}
+year_odf <- odf %>%
+  group_by(Year) %>%
+  summarize(num_medals = n())
+
+women_odf <- odf %>%
+  filter(Gender == "Women") %>%
+  group_by(Year) %>%
+  summarize(women_medals = n()) %>%
+  right_join(year_odf, by="Year") %>%
+  mutate(women_percent = women_medals/num_medals * 100)
+women_odf
+```
+
+Next we subtract the overall percentage of women medalists from the US's percentage to obtain a table showing the difference between the USA's and the total female winning percentage:
+```{r}
+USA_women_odf %>%
+  left_join(women_odf, by = "Year") %>%
+  ggplot(mapping = aes(x = Year, y = (women_medal_percent - women_percent))) +
+  geom_point() + geom_smooth(method = lm) +
+  labs(title = "USA Standardized Percentage of Female Medal Winning Athletes per Year",
+       x = "Year", 
+       y = "Standardized Percentage of USA Olympic Medals Won By Women")
+```
+
+You will note that the USA averages an above-average percentage of female medalists, and that this gap is gradually increasing over time. The conclusion? US female Olympians rock!
+
+Now that we have examined the difference in the USA's performance between the Summer and Winter Olympics and the contributions of each gender towards the medal total, let's look at the events themselves. We will create a dataframe that contains the number of medals that US athletes have won in each sport since the 2000 Olympics:
+```{r}
+Event_USA_df <- odf %>%
+  filter(Year >= 2000) %>%
+  filter(Country == "USA") %>%
+  group_by(Discipline) %>%
+  summarize(num_medals = n()) %>%
+  arrange(desc(num_medals))
+Event_USA_df
+```
+
+You can see that, for example, Swimming is the USA's most profitable discipline in terms of medal count.
+It's not enough to see which disciplines yield a high medal total, however; if we want to try to see what events the USA should focus on in future Olympics it would help to see which disciplines are growing the fastest. To do this, we will recalculate the above statistis, but since 2008. Then, dividing the number of medals that the USA has won sine 2008 by the number the USA has won since 2000, we can get a rough estimate of growth percentage:
+```{r}
+Recent_USA_df <- odf %>%
+  filter(Year >= 2008) %>%
+  filter(Country == "USA") %>%
+  group_by(Discipline) %>%
+  summarize(num_recent = n()) %>%
+  left_join(Event_USA_df, by="Discipline") %>%
+  mutate(growth = num_recent/num_medals * 100) %>%
+  arrange(desc(growth))
+  
+Recent_USA_df
+```
+
+The columns with growth of 100% are for sports that featured in the Olympics starting in 2008, and so are not necessarily as promising as them seem. However, a lot of useful information can still be gleaned from this chart. For example, disciplines such as fencing, diving, and judo show a huge potential for US growth in the future, so it could be beneficial to focus efforts there, rather than on big medal winners such as swimming, basketball, and football, which show almost no growth.
+
+3. Machine Learning
+Machine learning is a little hard to do for this dataset, as most of the attributes are terms, but I would like to explore the area a bit as it relates to US medal totals over time. This part is going to be a little short since I thought data analysis was a more interesting and useful endeavor for this dataset, but if you would like to read more about machine learning you can do so here: https://www.digitalocean.com/community/tutorials/an-introduction-to-machine-learning
+
+Hypothesis
+I would like to test the hypotheses that the Summer Olympics are more profitable medal-wise for the USA than the winter Olympics, and that female athletes are more profitable than male ones. (If you will remember, we reached conclusions similar to these in the data analysis section.)
+
+Training:
+First, let's train 2 models, one to predict the medal count by year for the Summer Olympics and the other for the Winter Olympics:
+Summer:
+```{r}
+lr_model <- lm(USA_num_medals~Year, data=USA_sdf)
+broom::tidy(lr_model)
+```
+
+Winter:
+```{r}
+lr_model <- lm(USA_num_medals~Year, data=USA_wdf)
+broom::tidy(lr_model)
+```
+
+You can see in the estimate column for term Year, the Summer Olympics chart has a higher value than the Winter Olympics one, and so our machine learning algorithm predicts that the Summer Olympic medal count will grow faster than its Winter Olympics counterpart.
+
+Similarly, if we create a model for the percentage of US medals won by women, the algorithm predicts that it will rise by about half a percent each year, or about 1 percent every Olympic Game.
+```{r}
+lr_model <- lm(women_medal_percent~Year, data=USA_women_odf)
+broom::tidy(lr_model)
+```
+
+Hypothesis Testing
+Finally, let's make sure our hypotheses are accurate with some hypothesis testing. To do this, we are going to use the anova function. More information can be found about it here: https://www.rdocumentation.org/packages/stats/versions/3.5.0/topics/anova
+
+```{r}
+anova(lm(USA_num_medals~Year, data=USA_sdf))
+```
+
+```{r}
+anova(lm(USA_num_medals~Year, data=USA_wdf))
+```
+
+
+```{r}
+anova(lm(women_medal_percent~Year, data=USA_women_odf))
+```
+
+I don't want to go into too much detail here, but the gist is that because the Pr(>F) values are small the models are relatively accurate. You can read more about them in the links above if you are interested.
+
+Conclusion
+So what have we learned from all of this? How can the USA increase its medal total in the future? We learned that the Summer Olympics are generally more profitable than the Winter Olympics for the USA, that female athletes have recently beeen bringing home more medals (and that they show signs of winning an even larger percentage of medals in the future), and we examined the various disciplines to see potential for US medal growth in each. 
+Based on everything that we have learned, I would say that if the USA puts more money into female athletes' development and focuses on high-growh sports such as fencing, judo, and tennis, and maintains a healthy focus on each season with a slight lean towards summer, the USA can expect consistent medal count growth in the future.
